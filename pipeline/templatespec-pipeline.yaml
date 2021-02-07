@@ -1,0 +1,64 @@
+trigger:
+- master
+
+variables:
+- name: templateSpecResourceGroupName
+  value: rg-templatespecs
+- name: templateSpecName
+  value: TemplateFromPipeline
+- name: location
+  value: 'Australia East'
+- name: azureServiceConnection
+  value: AzureSC
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+  - task: RunARMTTKTests@1
+    displayName: Run ARM TTK tests 
+    name: TTKtests
+    inputs:
+      templatelocation: '$(System.DefaultWorkingDirectory)'
+      resultLocation: '$(System.DefaultWorkingDirectory)\results'
+
+  - task: PublishTestResults@2
+    displayName: Publish ARM TTK Test Results
+    name: PublishResults
+    inputs:
+      testResultsFormat: 'NUnit'
+      testResultsFiles: '$(System.DefaultWorkingDirectory)\results\*-armttk.xml'
+    condition: always()
+
+  - task: PowerShell@2
+    displayName: "Set Git Commit message as variable"
+    inputs:
+      targetType: inline
+      script: |
+        $GitCommitMessage = git log -1 --pretty=%B
+        echo "##vso[task.setvariable variable=commitComment]$GitCommitMessage"
+
+  - task: AzurePowerShell@4
+    displayName: "Create Template spec Resource Group"
+    inputs:
+      azureSubscription: $(azureServiceConnection)      
+      scriptType: 'inlineScript'
+      azurePowerShellVersion: latestVersion
+      inline: |
+        try {
+          Get-AzResourceGroup -Name $(templateSpecResourceGroupName) -ErrorAction Stop
+          Write-Output "Resource Group $(templateSpecResourceGroupName) exists"
+        }
+        catch {
+          write-output "Creating Resource Group $(templateSpecResourceGroupName)"
+          New-AzResourceGroup -Name $(templateSpecResourceGroupName) -Location "$(location)"
+        }
+
+  - task: AzureCLI@2
+    displayName: "Create/Update Template Spec"
+    inputs:
+      azureSubscription: $(azureServiceConnection)      
+      scriptType: ps
+      scriptLocation: inlineScript
+      inlineScript: |
+        az ts create --name $(templateSpecName) --resource-group $(templateSpecResourceGroupName) --version-description "$(commitComment)" --location "$(location)" --template-file "$(System.DefaultWorkingDirectory)\azuredeploy.json" --version $(Build.BuildId) --yes
