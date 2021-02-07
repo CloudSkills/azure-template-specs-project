@@ -19,7 +19,7 @@ steps:
     displayName: Run ARM TTK tests 
     name: TTKtests
     inputs:
-      templatelocation: '$(System.DefaultWorkingDirectory)'
+      templatelocation: '$(System.DefaultWorkingDirectory)\pipeline'
       resultLocation: '$(System.DefaultWorkingDirectory)\results'
 
   - task: PublishTestResults@2
@@ -61,4 +61,4 @@ steps:
       scriptType: ps
       scriptLocation: inlineScript
       inlineScript: |
-        az ts create --name $(templateSpecName) --resource-group $(templateSpecResourceGroupName) --version-description "$(commitComment)" --location "$(location)" --template-file "$(System.DefaultWorkingDirectory)\azuredeploy.json" --version $(Build.BuildId) --yes
+        az ts create --name $(templateSpecName) --resource-group $(templateSpecResourceGroupName) --version-description "$(commitComment)" --location "$(location)" --template-file "$(System.DefaultWorkingDirectory)\pipeline\azuredeploy.json" --version $(Build.BuildId) --yes
